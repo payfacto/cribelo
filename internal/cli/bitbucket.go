@@ -143,7 +143,10 @@ func bb(root string, answer any, args ...string) error {
 		return fmt.Errorf("%s: %s", command, reason)
 	}
 	if runErr != nil {
-		reason := strings.TrimSpace(stderr.String())
+		reason := bbFailure([]byte(stderr.String()))
+		if reason == "" {
+			reason = strings.TrimSpace(stderr.String())
+		}
 		if reason == "" {
 			reason = runErr.Error()
 		}
@@ -155,8 +158,8 @@ func bb(root string, answer any, args ...string) error {
 	return nil
 }
 
-// bbFailure is the message of the error object bb prints on a failure,
-// empty when the answer is not one.
+// bbFailure is the message of the error object bb prints on a failure, on
+// stdout or stderr; empty when the output is not one.
 func bbFailure(out []byte) string {
 	var failure struct {
 		Error *struct {

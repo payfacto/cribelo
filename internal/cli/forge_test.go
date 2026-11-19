@@ -287,3 +287,13 @@ func TestBbErrorObjectIsAnError(t *testing.T) {
 	_, err := forge{Kind: bitbucket, Project: "payfactopay/cribelo"}.list(".", 20, true)
 	assert.ErrorContains(t, err, "HTTP 429: Rate limit", "bb exits 0 with an error object")
 }
+
+func TestBbErrorObjectOnStderrIsReadAsItsMessage(t *testing.T) {
+	bin := t.TempDir()
+	script := "#!/bin/sh\necho '{\"error\":{\"code\":\"rate_limited\",\"message\":\"HTTP 429: Rate limit\"}}' >&2\nexit 1\n"
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "bb"), []byte(script), 0o755))
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	_, err := forge{Kind: bitbucket, Project: "payfactopay/cribelo"}.list(".", 20, true)
+	assert.EqualError(t, err, "bb pr list: HTTP 429: Rate limit")
+}
