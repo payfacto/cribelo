@@ -1,9 +1,6 @@
 # Cribelo on Bitbucket Cloud pull requests (PayFacto fork). Copy the step
-# below into your bitbucket-pipelines.yml.
-#
-# Needs, once per workspace: the secured workspace variable
-# CRIBELO_DOWNLOAD_TOKEN, a read-only repository access token of
-# payfactopay/cribelo. It downloads the binary and the script.
+# below into your bitbucket-pipelines.yml. The binary and the script come
+# from the public GitHub mirror payfacto/cribelo: no token to download.
 #
 # Optional, per repository:
 #   CRIBELO_TOKEN           secured, a repository access token of your
@@ -13,7 +10,7 @@
 #                           comment is edited.
 #   CRIBELO_VERSION         a release such as 2.4.0-pf.1; latest by default.
 #                           Pin it: with latest, the script runs from the main
-#                           branch of payfactopay/cribelo with your secrets.
+#                           branch of payfacto/cribelo with your secrets.
 #   CRIBELO_BUDGET, CRIBELO_TOP, CRIBELO_FAIL_ON, CRIBELO_FAIL_OVER: as for
 #                           the GitHub Action. The step fails only with these.
 
@@ -26,21 +23,19 @@ definitions:
         clone:
           depth: full
         script:
-          # A missing token or a failed download skips cribelo, it never fails the pull request.
+          # A failed download skips cribelo, it never fails the pull request.
           - apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends ca-certificates curl git jq >/dev/null
           - |
             version="${CRIBELO_VERSION:-latest}"
-            api="https://api.bitbucket.org/2.0/repositories/payfactopay/cribelo"
+            github="https://github.com/payfacto/cribelo"
             if [ "$version" = latest ]; then
-              binary="cribelo_Linux_x86_64"; ref="main"
+              binary_url="$github/releases/latest/download/cribelo_Linux_x86_64"; ref="main"
             else
-              binary="cribelo_${version#v}_Linux_x86_64"; ref="v${version#v}"
+              binary_url="$github/releases/download/v${version#v}/cribelo_Linux_x86_64"; ref="v${version#v}"
             fi
             git config --global --add safe.directory "$BITBUCKET_CLONE_DIR"
-            if [ -z "${CRIBELO_DOWNLOAD_TOKEN:-}" ]; then
-              echo "cribelo: CRIBELO_DOWNLOAD_TOKEN is not set, skipping (see docs/bitbucket.md)"
-            elif ! curl -fsSL -H "Authorization: Bearer $CRIBELO_DOWNLOAD_TOKEN" "${CRIBELO_DOWNLOAD_URL:-$api/downloads/$binary}" -o /usr/local/bin/cribelo \
-              || ! curl -fsSL -H "Authorization: Bearer $CRIBELO_DOWNLOAD_TOKEN" "$api/src/$ref/scripts/bitbucket-pr-comment.sh" -o /tmp/cribelo-pr-comment.sh; then
+            if ! curl -fsSL "${CRIBELO_DOWNLOAD_URL:-$binary_url}" -o /usr/local/bin/cribelo \
+              || ! curl -fsSL "https://raw.githubusercontent.com/payfacto/cribelo/$ref/scripts/bitbucket-pr-comment.sh" -o /tmp/cribelo-pr-comment.sh; then
               echo "cribelo: could not download cribelo $version, skipping"
             else
               chmod +x /usr/local/bin/cribelo

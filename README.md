@@ -111,7 +111,7 @@ One line in `.gitlab-ci.yml`, on gitlab.com or on your own instance. [The note o
 
 ## In a Bitbucket Cloud pull request (PayFacto fork)
 
-This fork also runs on Bitbucket Cloud: a comment on each pull request, links to the files, and `cribelo inbox` / `cribelo pr` through `bb`. [Setup, tokens and limits](docs/bitbucket.md).
+This fork also runs on Bitbucket Cloud: a comment on each pull request, links to the files, and `cribelo inbox` / `cribelo pr` through `bb`. Install it with `brew install payfacto/tap/cribelo`, or the Windows `.exe` from the [releases of payfacto/cribelo](https://github.com/payfacto/cribelo/releases/latest). [Setup, tokens and limits](docs/bitbucket.md).
 
 ## What it does not do
 

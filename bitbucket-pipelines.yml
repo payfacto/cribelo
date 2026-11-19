@@ -1,48 +1,62 @@
-# The PayFacto fork of cribelo. Every push: format, vet, tests, build. A tag
-# v<upstream>-pf.<n> (v2.4.0-pf.1) also publishes the Linux binary to the
-# Downloads of this repository, under its version and as the latest, once
-# the tests pass. Needs the secured repository variable
-# CRIBELO_RELEASE_TOKEN: a repository access token of this repository with
-# the repository:write scope.
-
-image: golang:1.27-bookworm
+# The PayFacto fork of cribelo. Bitbucket (payfactopay/cribelo) is the source
+# of truth and keeps .context/. GitHub (payfacto/cribelo, public) is a release
+# mirror with .context/ stripped from history: its .github/workflows/release.yml
+# builds Linux, macOS and Windows on a tag and updates payfacto/homebrew-tap.
+#
+# Every push: format, vet, tests, build. main and tags v<upstream>-pf.<n>
+# (v2.4.0-pf.1) are then mirrored, after the tests pass.
+#
+# The mirror needs, once: the repository variable GITHUB_MIRROR_ENABLED=true,
+# and a deploy key with write access on payfacto/cribelo in Repository
+# settings -> Pipelines -> SSH keys (with github.com as a known host).
+# Without the variable the mirror step says so and passes.
+#
+# Why filter-repo is version-pinned (as in payfactopay/bb): the rewrite is
+# deterministic only for a fixed version and fixed args; a bump can change
+# every SHA and force-push the whole history again. Do not float it.
+# Never push upstream's tags from here: only the current tag is pushed.
 
 definitions:
+  caches:
+    gomodules: /go/pkg/mod
   steps:
     - step: &check
         name: format, vet, test, build
+        image: golang:1.27-bookworm
+        caches:
+          - gomodules
         script:
           - apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends jq >/dev/null
           - test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
           - go vet ./...
           - CGO_ENABLED=1 go test ./...
           - bash scripts/test/bitbucket-pr-comment.sh
+          - bash scripts/test/release-scripts.sh
           - CGO_ENABLED=1 go build -o cribelo . && ./cribelo --version
-        caches:
-          - gomodules
-
-  caches:
-    gomodules: /go/pkg/mod
+    - step: &mirror
+        name: strip .context and mirror to GitHub
+        image: python:3.13-alpine3.21
+        clone:
+          depth: full # filter-repo refuses a shallow clone
+        script:
+          - |
+            if [ "${GITHUB_MIRROR_ENABLED:-}" != true ]; then
+              echo "mirror: GITHUB_MIRROR_ENABLED is not true, nothing pushed to GitHub (see bitbucket-pipelines.yml)"
+            else
+              sh scripts/mirror-to-github.sh
+            fi
 
 pipelines:
   default:
     - step: *check
+  branches:
+    main:
+      - step: *check
+      - step: *mirror
   tags:
     'v*':
       - step: *check
-      - step:
-          name: publish the Linux binary
-          caches:
-            - gomodules
-          script:
-            - set -euo pipefail
-            - version="${BITBUCKET_TAG#v}"
-            - mkdir -p out
-            - CGO_ENABLED=1 go build -trimpath -ldflags "-s -w -X main.version=${version}" -o "out/cribelo_${version}_Linux_x86_64" .
-            - '"./out/cribelo_${version}_Linux_x86_64" --version'
-            - cp "out/cribelo_${version}_Linux_x86_64" out/cribelo_Linux_x86_64
-            - |
-              for file in "out/cribelo_${version}_Linux_x86_64" out/cribelo_Linux_x86_64; do
-                curl -fsS -X POST -H "Authorization: Bearer $CRIBELO_RELEASE_TOKEN" -F "files=@$file" \
-                  "https://api.bitbucket.org/2.0/repositories/$BITBUCKET_REPO_FULL_NAME/downloads" >/dev/null || exit 1
-              done
+      - step: *mirror
+  custom:
+    mirror-manual:
+      - step: *mirror
