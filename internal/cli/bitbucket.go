@@ -2,7 +2,6 @@ package cli
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os/exec"
 	"slices"
@@ -36,16 +35,11 @@ type bitbucketPull struct {
 			Name string `json:"name"`
 		} `json:"branch"`
 	} `json:"destination"`
-	Reviewers []bitbucketAccount `json:"reviewers"`
-	Links     struct {
+	Links struct {
 		HTML struct {
 			Href string `json:"href"`
 		} `json:"html"`
 	} `json:"links"`
-}
-
-type bitbucketAccount struct {
-	AccountID string `json:"account_id"`
 }
 
 func (b bitbucketPull) pull() pullRequest {
@@ -63,51 +57,20 @@ func (b bitbucketPull) pull() pullRequest {
 	return p
 }
 
-// asksReviewOf tells whether the account is among the reviewers.
-func (b bitbucketPull) asksReviewOf(accountID string) bool {
-	return slices.ContainsFunc(b.Reviewers, func(r bitbucketAccount) bool { return r.AccountID == accountID })
-}
-
 // bitbucketList reads the open pull requests: those that ask for the review
-// of the user, or all of them.
+// of the user, or all of them. bb filters on the reviewers with Bitbucket.
 func (f forge) bitbucketList(root string, limit int, all bool) ([]pullRequest, error) {
-	var listed []bitbucketPull
-	if err := bb(root, &listed, f.inRepository("pr", "list")...); err != nil {
-		return nil, err
-	}
+	args := []string{"pr", "list"}
 	if !all {
-		return f.askingReviewOfMe(root, listed, limit)
+		args = append(args, "--reviewer", "me")
+	}
+	var listed []bitbucketPull
+	if err := bb(root, &listed, f.inRepository(args...)...); err != nil {
+		return nil, err
 	}
 	pulls := make([]pullRequest, 0, min(len(listed), limit))
 	for _, b := range listed[:min(len(listed), limit)] {
 		pulls = append(pulls, b.pull())
-	}
-	return pulls, nil
-}
-
-// askingReviewOfMe keeps the pull requests whose reviewers include the
-// user. The list of Bitbucket is short of the reviewers, so each pull
-// request is read until the limit is reached.
-func (f forge) askingReviewOfMe(root string, listed []bitbucketPull, limit int) ([]pullRequest, error) {
-	var me bitbucketAccount
-	if err := bb(root, &me, "user", "me"); err != nil {
-		return nil, err
-	}
-	if me.AccountID == "" {
-		return nil, errors.New("bb user me: no account in the answer, run bb setup")
-	}
-	var pulls []pullRequest
-	for _, b := range listed {
-		if len(pulls) >= limit {
-			break
-		}
-		full, err := f.bitbucketGet(root, b.ID)
-		if err != nil {
-			return nil, err
-		}
-		if full.asksReviewOf(me.AccountID) {
-			pulls = append(pulls, b.pull())
-		}
 	}
 	return pulls, nil
 }
@@ -170,4 +133,41 @@ func bbFailure(out []byte) string {
 		return ""
 	}
 	return failure.Error.Message
+}
+
+// minimumBb is the first bb that filters pull requests on their reviewers.
+var minimumBb = [3]int{0, 20, 0}
+
+// bbVersion is the error of a bb older than minimumBb, or of a bb that does
+// not tell its version.
+func bbVersion() error {
+	out, err := exec.Command("bb", "--version").Output()
+	found := "no version"
+	if words := strings.Fields(strings.TrimPrefix(strings.TrimSpace(string(out)), "bb version")); len(words) > 0 {
+		found = words[0]
+	}
+	if err == nil && atLeast(found, minimumBb) {
+		return nil
+	}
+	return fmt.Errorf("cribelo needs bb v%d.%d.%d or later (found %s): run brew upgrade bb",
+		minimumBb[0], minimumBb[1], minimumBb[2], found)
+}
+
+// atLeast tells whether a version such as v0.20.1 or 0.21.0-rc.1 is at
+// least the minimum. A pre-release counts as its release.
+func atLeast(version string, minimum [3]int) bool {
+	core, _, _ := strings.Cut(strings.TrimPrefix(version, "v"), "-")
+	parts := strings.Split(core, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	var got [3]int
+	for i, part := range parts {
+		n, err := strconv.Atoi(part)
+		if err != nil {
+			return false
+		}
+		got[i] = n
+	}
+	return slices.Compare(got[:], minimum[:]) >= 0
 }

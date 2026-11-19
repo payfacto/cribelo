@@ -220,11 +220,11 @@ func fakeBb(t *testing.T) (log string) {
 			`,"links":{"html":{"href":"https://bitbucket.org/payfactopay/cribelo/pull-requests/` + strconv.Itoa(id) + `"}}}`
 	}
 	script := `#!/bin/sh
+if [ "$*" = --version ]; then echo 'bb version v0.20.0'; exit 0; fi
 echo "$*" >> "` + log + `"
 case "$*" in
-  "user me"*) echo '{"account_id":"me-1","nickname":"Jay"}' ;;
+  "pr list --reviewer me "*) echo '[` + pull(12, "feat: two", "feat/two", "e7026f3d39e9", true, "me-1") + `]' ;;
   "pr list"*) echo '[` + pull(12, "feat: two", "feat/two", "e7026f3d39e9", true, "") + `,` + pull(11, "fix: one", "fix/one", "5eccbb9373f4", false, "") + `]' ;;
-  "pr get --pr-id 12 "*) echo '` + pull(12, "feat: two", "feat/two", "e7026f3d39e9", true, "me-1") + `' ;;
   "pr get --pr-id 11 "*) echo '` + pull(11, "fix: one", "fix/one", "5eccbb9373f4", false, "other") + `' ;;
   "pr get"*) echo '{"error":{"code":"not_found","message":"HTTP 404: no such pull request"}}'; exit 1 ;;
 esac
@@ -232,6 +232,16 @@ esac
 	require.NoError(t, os.WriteFile(filepath.Join(bin, "bb"), []byte(script), 0o755))
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	return log
+}
+
+// installBb puts on the PATH a bb that prints the version given and runs the
+// shell commands of body for any other command.
+func installBb(t *testing.T, version, body string) {
+	t.Helper()
+	bin := t.TempDir()
+	script := "#!/bin/sh\nif [ \"$*\" = --version ]; then echo 'bb version " + version + "'; exit 0; fi\n" + body
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "bb"), []byte(script), 0o755))
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
 func TestBitbucketPullRequestsAreReadWithBb(t *testing.T) {
@@ -269,31 +279,42 @@ func TestBitbucketPullRequestsAreReadWithBb(t *testing.T) {
 	assert.Equal(t, []string{
 		"pr list -w payfactopay -r cribelo -f json",
 		"pr list -w payfactopay -r cribelo -f json",
-		"pr list -w payfactopay -r cribelo -f json",
-		"user me -f json",
-		"pr get --pr-id 12 -w payfactopay -r cribelo -f json",
-		"pr get --pr-id 11 -w payfactopay -r cribelo -f json",
+		"pr list --reviewer me -w payfactopay -r cribelo -f json",
 		"pr get --pr-id 11 -w payfactopay -r cribelo -f json",
 		"pr get --pr-id 9 -w payfactopay -r cribelo -f json",
 	}, strings.Split(strings.TrimSpace(string(calls)), "\n"))
 }
 
 func TestBbErrorObjectIsAnError(t *testing.T) {
-	bin := t.TempDir()
-	script := "#!/bin/sh\necho '{\"error\":{\"code\":\"rate_limited\",\"message\":\"HTTP 429: Rate limit\"}}'\n"
-	require.NoError(t, os.WriteFile(filepath.Join(bin, "bb"), []byte(script), 0o755))
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	installBb(t, "v0.20.0", "echo '{\"error\":{\"code\":\"rate_limited\",\"message\":\"HTTP 429: Rate limit\"}}'\n")
 
 	_, err := forge{Kind: bitbucket, Project: "payfactopay/cribelo"}.list(".", 20, true)
 	assert.ErrorContains(t, err, "HTTP 429: Rate limit", "bb exits 0 with an error object")
 }
 
 func TestBbErrorObjectOnStderrIsReadAsItsMessage(t *testing.T) {
-	bin := t.TempDir()
-	script := "#!/bin/sh\necho '{\"error\":{\"code\":\"rate_limited\",\"message\":\"HTTP 429: Rate limit\"}}' >&2\nexit 1\n"
-	require.NoError(t, os.WriteFile(filepath.Join(bin, "bb"), []byte(script), 0o755))
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	installBb(t, "v0.20.0", "echo '{\"error\":{\"code\":\"rate_limited\",\"message\":\"HTTP 429: Rate limit\"}}' >&2\nexit 1\n")
 
 	_, err := forge{Kind: bitbucket, Project: "payfactopay/cribelo"}.list(".", 20, true)
 	assert.EqualError(t, err, "bb pr list: HTTP 429: Rate limit")
+}
+
+func TestBbOlderThanTheMinimumIsRefused(t *testing.T) {
+	site := forge{Kind: bitbucket, Project: "payfactopay/cribelo"}
+	for _, version := range []string{"v0.18.0", "v0.19.9", "dev"} {
+		installBb(t, version, "echo '[]'\n")
+		_, err := site.list(".", 20, true)
+		assert.EqualError(t, err, "cribelo needs bb v0.20.0 or later (found "+version+"): run brew upgrade bb", version)
+		_, _, err = site.view(".", 1)
+		assert.ErrorContains(t, err, "cribelo needs bb v0.20.0 or later", version)
+	}
+}
+
+func TestBbAtOrAboveTheMinimumIsAccepted(t *testing.T) {
+	site := forge{Kind: bitbucket, Project: "payfactopay/cribelo"}
+	for _, version := range []string{"v0.20.0", "v0.20.1-rc.1", "v0.21.0", "v1.0.0", "0.20.0", "v0.20.0 (commit 541d6eb)"} {
+		installBb(t, version, "echo '[]'\n")
+		_, err := site.list(".", 20, true)
+		assert.NoError(t, err, version)
+	}
 }

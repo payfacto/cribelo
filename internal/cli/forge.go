@@ -200,6 +200,9 @@ func (f forge) tool(command string) error {
 	if _, err := exec.LookPath(name); err != nil {
 		return fmt.Errorf("%s reads the %ss with %s", command, f.noun(), where)
 	}
+	if f.Kind == bitbucket {
+		return bbVersion()
+	}
 	return nil
 }
 

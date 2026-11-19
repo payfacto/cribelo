@@ -15,7 +15,7 @@ Bitbucket does not render HTML, so the folded sections of the plan come as plain
 
 ## On your machine
 
-`cribelo inbox` and `cribelo pr 12` read the pull requests with `bb` (the PayFacto Bitbucket Cloud CLI), which must be set up (`bb setup`). The workspace and the repository come from the `origin` remote (`bitbucket.org` or `ssh.bitbucket.org`). The list of Bitbucket does not carry the reviewers, so the inbox reads each open pull request once to know whether it asks for your review: one API call per open pull request (`--all` skips them).
+`cribelo inbox` and `cribelo pr 12` read the pull requests with `bb` (the PayFacto Bitbucket Cloud CLI) v0.20.0 or later, which must be set up (`bb setup`); an older `bb` stops with "cribelo needs bb v0.20.0 or later", and `brew upgrade bb` fixes it. The workspace and the repository come from the `origin` remote (`bitbucket.org` or `ssh.bitbucket.org`). The inbox lists the pull requests where you are a formal reviewer (`bb pr list --reviewer me`, one API call); a comment alone does not make you a reviewer. `--all` lists every open pull request.
 
 Bitbucket Cloud keeps no ref per pull request: the head is fetched from its branch on `origin`. A pull request from a fork cannot be planned. When its branch moved on since Bitbucket answered, the commit Bitbucket named is planned. `--viewed` works on GitHub only.
 
