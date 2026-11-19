@@ -20,18 +20,20 @@ import (
 // one its own plan would give, and the shortest come first: ten minutes
 // spent there unblock someone today.
 //
-// The list comes from the command line of the forge (gh, or glab on
-// GitLab), the code from the pull request refs of the remote. Each head is checked out in a temporary worktree and
+// The list comes from the command line of the forge (gh, glab on GitLab,
+// bb on Bitbucket Cloud), the code from the pull request refs of the remote,
+// or from the branch of the pull request on Bitbucket Cloud. Each head is checked out in a temporary worktree and
 // planned like a local change; the plan of a head already seen is kept
 // under the git directory.
 
 // pullRequest is an open pull request, in the words of gh; a merge request
-// of GitLab is read into the same fields.
+// of GitLab and a pull request of Bitbucket are read into the same fields.
 type pullRequest struct {
 	Number      int    `json:"number"`
 	Title       string `json:"title"`
 	URL         string `json:"url"`
 	HeadRefOid  string `json:"headRefOid"`
+	HeadRefName string `json:"headRefName"`
 	BaseRefName string `json:"baseRefName"`
 	IsDraft     bool   `json:"isDraft"`
 	UpdatedAt   string `json:"updatedAt"`
@@ -130,9 +132,11 @@ func fetchPulls(root string, site forge, pulls []pullRequest) map[int]string {
 		if p.HeadRefOid == "" {
 			continue
 		}
-		if _, err := gitIn(root, "cat-file", "-e", p.HeadRefOid+"^{commit}"); err != nil {
+		// The tip of a Bitbucket branch is fetched every time: the commit
+		// the API named must still be on it.
+		if _, err := gitIn(root, "cat-file", "-e", p.HeadRefOid+"^{commit}"); err != nil || site.Kind == bitbucket {
 			wanted = append(wanted, p)
-			refspecs = append(refspecs, fmt.Sprintf("+%s:refs/cribelo/pull/%d", site.headRef(p.Number), p.Number))
+			refspecs = append(refspecs, fmt.Sprintf("+%s:refs/cribelo/pull/%d", site.headRef(p), p.Number))
 		}
 	}
 	unfetched := map[int]string{}
@@ -141,12 +145,47 @@ func fetchPulls(root string, site forge, pulls []pullRequest) map[int]string {
 			gitIn(root, "fetch", "--quiet", "--no-tags", remote, fmt.Sprintf("+refs/heads/%s:refs/cribelo/base/%s", base, base))
 		}
 		for _, p := range wanted {
-			if _, err := gitIn(root, "fetch", "--quiet", "--no-tags", remote, fmt.Sprintf("+%s:refs/cribelo/pull/%d", site.headRef(p.Number), p.Number)); err != nil {
-				unfetched[p.Number] = "its head is not on " + remote
+			if _, err := gitIn(root, "fetch", "--quiet", "--no-tags", remote, fmt.Sprintf("+%s:refs/cribelo/pull/%d", site.headRef(p), p.Number)); err != nil {
+				unfetched[p.Number] = site.headGone()
 			}
 		}
 	}
+	if site.Kind == bitbucket {
+		resolveHeads(root, pulls, unfetched)
+	}
 	return unfetched
+}
+
+// headGone is why the head of a pull request could not be fetched.
+func (f forge) headGone() string {
+	if f.Kind == bitbucket {
+		return "its branch is gone from " + f.Remote
+	}
+	return "its head is not on " + f.Remote
+}
+
+// resolveHeads reads the short hashes Bitbucket gives as full ones, in
+// place. The commit the API named is the one planned, even when its branch
+// has moved on since; one no longer on the branch tip just fetched (a force
+// push) is told.
+func resolveHeads(root string, pulls []pullRequest, unfetched map[int]string) {
+	const notOnBranch = "its commit is no longer on its branch"
+	for i, p := range pulls {
+		if _, gone := unfetched[p.Number]; gone || p.HeadRefOid == "" {
+			continue
+		}
+		full, err := gitIn(root, "rev-parse", "--verify", "--quiet", p.HeadRefOid+"^{commit}")
+		if err != nil {
+			unfetched[p.Number] = notOnBranch
+			continue
+		}
+		full = strings.TrimSpace(full)
+		if _, err := gitIn(root, "merge-base", "--is-ancestor", full, fmt.Sprintf("refs/cribelo/pull/%d", p.Number)); err != nil {
+			unfetched[p.Number] = notOnBranch
+			continue
+		}
+		pulls[i].HeadRefOid = full
+	}
 }
 
 // measurePulls plans every pull request. A pull request that cannot be

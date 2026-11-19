@@ -54,7 +54,7 @@ func Run(args []string, version string) int {
 			&cli.StringFlag{Name: "weights", Usage: "weights file (default .cribelo/weights.json)"},
 			&cli.BoolFlag{Name: "no-clones", Usage: "skip duplicate detection"},
 			&cli.StringFlag{Name: "coverage", Usage: "coverage report to read the untested changed lines from (lcov, Cobertura, Clover or Go profile; default: the usual places; none to skip)"},
-			&cli.StringFlag{Name: "pull-request", Usage: "address of the pull or merge request, to link the Markdown plan to its diff (default: read from GitHub Actions or GitLab CI; none for no link)"},
+			&cli.StringFlag{Name: "pull-request", Usage: "address of the pull or merge request, to link the Markdown plan to its diff (default: read from GitHub Actions, GitLab CI or Bitbucket Pipelines; none for no link)"},
 			&cli.BoolFlag{Name: "no-color", Usage: "plain output"},
 		},
 		Before: func(c *cli.Context) error {
@@ -104,23 +104,23 @@ func Run(args []string, version string) int {
 			},
 			{
 				Name:      "pr",
-				Usage:     "plan a pull request or a merge request by its number, without checking it out (needs gh, or glab on GitLab)",
+				Usage:     "plan a pull request or a merge request by its number, without checking it out (needs gh, glab on GitLab, or bb on Bitbucket Cloud)",
 				ArgsUsage: "<number>",
 				Flags: []cli.Flag{
 					&cli.BoolFlag{Name: "viewed", Usage: "mark as viewed, on GitHub and for you, the files a reviewer need not open: mechanical changes, renames, generated files"},
 					&cli.BoolFlag{Name: "dry-run", Usage: "with --viewed, list the files without marking them"},
-					&cli.StringFlag{Name: "forge", Usage: "github or gitlab, when the host of the remote does not say which"},
+					&cli.StringFlag{Name: "forge", Usage: "github, gitlab or bitbucket, when the host of the remote does not say which"},
 				},
 				Action: runPull,
 			},
 			{
 				Name:  "inbox",
-				Usage: "list the pull requests or merge requests that wait for your review, with the time each takes to read (needs gh, or glab on GitLab)",
+				Usage: "list the pull requests or merge requests that wait for your review, with the time each takes to read (needs gh, glab on GitLab, or bb on Bitbucket Cloud)",
 				Flags: []cli.Flag{
 					&cli.BoolFlag{Name: "all", Usage: "every open pull request, not only those that ask for your review"},
 					&cli.BoolFlag{Name: "drafts", Usage: "keep the drafts"},
 					&cli.IntFlag{Name: "limit", Value: 20, Usage: "pull requests read at most"},
-					&cli.StringFlag{Name: "forge", Usage: "github or gitlab, when the host of the remote does not say which"},
+					&cli.StringFlag{Name: "forge", Usage: "github, gitlab or bitbucket, when the host of the remote does not say which"},
 				},
 				Action: runInbox,
 			},
@@ -327,6 +327,9 @@ func pullRequestAddress(given string, env func(string) string) string {
 	}
 	if project, iid := env("CI_MERGE_REQUEST_PROJECT_URL"), env("CI_MERGE_REQUEST_IID"); project != "" && iid != "" {
 		return project + "/-/merge_requests/" + iid
+	}
+	if workspace, slug, id := env("BITBUCKET_WORKSPACE"), env("BITBUCKET_REPO_SLUG"), env("BITBUCKET_PR_ID"); workspace != "" && slug != "" && id != "" {
+		return "https://bitbucket.org/" + workspace + "/" + slug + "/pull-requests/" + id
 	}
 	return ""
 }

@@ -109,6 +109,10 @@ include:
 
 One line in `.gitlab-ci.yml`, on gitlab.com or on your own instance. [The note on the merge request, the options, runners without access to github.com](docs/gitlab.md).
 
+## In a Bitbucket Cloud pull request (PayFacto fork)
+
+This fork also runs on Bitbucket Cloud: a comment on each pull request, links to the files, and `cribelo inbox` / `cribelo pr` through `bb`. [Setup, tokens and limits](docs/bitbucket.md).
+
 ## What it does not do
 
 Cribelo does not find your bugs. It tells you where your reading time goes, and it shows its work: [how it is computed](docs/how-it-is-computed.md) gives every rule and every weight, so that you can contest them.

@@ -15,7 +15,7 @@ import (
 // A reviewer goes from the inbox to a pull request without leaving what is
 // checked out: `cribelo pr 212` fetches the head, plans it in a temporary
 // worktree and prints the plan, its line ranges pointing at the diff on
-// GitHub or at the file on GitLab. With --viewed, the files the plan sets aside whole are ticked as
+// GitHub or at the file on GitLab and Bitbucket. With --viewed, the files the plan sets aside whole are ticked as
 // viewed for that reviewer: the Files tab opens on what is left to read.
 
 // markViewed is the GraphQL mutation behind the "Viewed" checkbox.
@@ -73,9 +73,11 @@ func runPull(c *cli.Context) error {
 	if pull.HeadRefOid == "" {
 		return fmt.Errorf("%s%d has no commit yet", site.sign(), number)
 	}
-	if reason, failed := fetchPulls(repo.Root, site, []pullRequest{pull})[number]; failed {
+	pulls := []pullRequest{pull}
+	if reason, failed := fetchPulls(repo.Root, site, pulls)[number]; failed {
 		return fmt.Errorf("%s%d: %s", site.sign(), number, reason)
 	}
+	pull = pulls[0]
 	plan, err := planAt(repo.Root, pull.HeadRefOid, "refs/cribelo/base/"+pull.BaseRefName, planOptions(c, core.Options{}))
 	if err != nil {
 		return err

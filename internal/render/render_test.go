@@ -208,8 +208,14 @@ func TestPullRequestLinks(t *testing.T) {
 	assert.Equal(t, "https://gitlab.example.com/group/sub/project/-/blob/abc123/src/a.go#L12-40", gitlab("src/a.go", 12, 40))
 	assert.Equal(t, "https://gitlab.example.com/group/sub/project/-/blob/abc123/src/a.go#L12", gitlab("src/a.go", 12, 12))
 
+	bitbucket, err := PullRequestLinks("https://bitbucket.org/payfactopay/cribelo/pull-requests/7", "abc123")
+	require.NoError(t, err)
+	assert.Equal(t, "https://bitbucket.org/payfactopay/cribelo/src/abc123/src/a%20b.go", bitbucket("src/a b.go", 0, 0))
+	assert.Equal(t, "https://bitbucket.org/payfactopay/cribelo/src/abc123/src/a.go#lines-12:40", bitbucket("src/a.go", 12, 40))
+	assert.Equal(t, "https://bitbucket.org/payfactopay/cribelo/src/abc123/src/a.go#lines-12", bitbucket("src/a.go", 12, 12))
+
 	_, err = PullRequestLinks("https://example.com/somewhere", "abc")
-	assert.Error(t, err)
+	assert.ErrorContains(t, err, "Bitbucket pull request")
 }
 
 func TestShortNames(t *testing.T) {

@@ -13,12 +13,13 @@ import (
 
 // The inbox and `cribelo pr` read the open changes of a forge through its
 // own command line, which already holds the login of the user: gh on
-// GitHub, glab on GitLab. Everything after that (the fetch of the heads,
-// the plan, the cache) is the same on both.
+// GitHub, glab on GitLab, bb on Bitbucket Cloud. Everything after that (the
+// fetch of the heads, the plan, the cache) is the same on all three.
 
 const (
-	github = "github"
-	gitlab = "gitlab"
+	github    = "github"
+	gitlab    = "gitlab"
+	bitbucket = "bitbucket"
 )
 
 // forge is where the pull requests of a repository live.
@@ -26,8 +27,8 @@ type forge struct {
 	Kind   string
 	Remote string
 	// Host and Project locate the repository on the forge: gitlab.com and
-	// group/subgroup/project. Only GitLab needs them, gh reads the remote
-	// by itself.
+	// group/subgroup/project, or bitbucket.org and workspace/repository.
+	// GitLab and Bitbucket need them, gh reads the remote by itself.
 	Host    string
 	Project string
 }
@@ -58,9 +59,12 @@ func parseRemote(address string) (host, path string) {
 }
 
 // forgeOf tells the forge of a host by its name; empty when the name says
-// nothing (a self-hosted instance).
+// nothing (a self-hosted instance). Bitbucket is Bitbucket Cloud only: a
+// Data Center under a name of its own is not read with bb.
 func forgeOf(host string) string {
 	switch host = strings.ToLower(host); {
+	case host == "bitbucket.org" || host == "ssh.bitbucket.org":
+		return bitbucket
 	case strings.Contains(host, "github"):
 		return github
 	case strings.Contains(host, "gitlab"):
@@ -115,8 +119,8 @@ func detectForge(root, forced string) (forge, error) {
 			forced = strings.TrimSpace(out)
 		}
 	}
-	if forced != "" && forced != github && forced != gitlab {
-		return forge{}, fmt.Errorf("unknown forge %q (github or gitlab)", forced)
+	if forced != "" && forced != github && forced != gitlab && forced != bitbucket {
+		return forge{}, fmt.Errorf("unknown forge %q (github, gitlab or bitbucket)", forced)
 	}
 	out, err := gitIn(root, "remote", "-v")
 	if err != nil {
@@ -171,19 +175,27 @@ func (f forge) sign() string {
 }
 
 // headRef is the ref the forge keeps the head of a pull request under,
-// whether it comes from a fork or not.
-func (f forge) headRef(number int) string {
-	if f.Kind == gitlab {
-		return fmt.Sprintf("refs/merge-requests/%d/head", number)
+// whether it comes from a fork or not. Bitbucket Cloud keeps none: the head
+// is read from its branch on the remote, so a pull request from a fork
+// cannot be fetched.
+func (f forge) headRef(pull pullRequest) string {
+	switch f.Kind {
+	case gitlab:
+		return fmt.Sprintf("refs/merge-requests/%d/head", pull.Number)
+	case bitbucket:
+		return "refs/heads/" + pull.HeadRefName
 	}
-	return fmt.Sprintf("refs/pull/%d/head", number)
+	return fmt.Sprintf("refs/pull/%d/head", pull.Number)
 }
 
 // tool checks that the command line of the forge is installed.
 func (f forge) tool(command string) error {
 	name, where := "gh", "the GitHub command line: install gh (https://cli.github.com) and run gh auth login"
-	if f.Kind == gitlab {
+	switch f.Kind {
+	case gitlab:
 		name, where = "glab", "the GitLab command line: install glab (https://gitlab.com/gitlab-org/cli) and run glab auth login"
+	case bitbucket:
+		name, where = "bb", "the Bitbucket command line: install bb and run bb setup"
 	}
 	if _, err := exec.LookPath(name); err != nil {
 		return fmt.Errorf("%s reads the %ss with %s", command, f.noun(), where)
@@ -198,6 +210,9 @@ const pullFields = "number,title,url,headRefOid,baseRefName,isDraft,updatedAt,au
 func (f forge) list(root string, limit int, all bool) ([]pullRequest, error) {
 	if err := f.tool("inbox"); err != nil {
 		return nil, err
+	}
+	if f.Kind == bitbucket {
+		return f.bitbucketList(root, limit, all)
 	}
 	if f.Kind == gitlab {
 		fields := []string{"state=opened", "per_page=" + strconv.Itoa(min(max(limit, 1), 100))}
@@ -247,6 +262,10 @@ func (f forge) list(root string, limit int, all bool) ([]pullRequest, error) {
 // knows it by, empty on GitLab.
 func (f forge) view(root string, number int) (pull pullRequest, id string, err error) {
 	if err := f.tool("pr"); err != nil {
+		return pull, "", err
+	}
+	if f.Kind == bitbucket {
+		pull, err := f.bitbucketView(root, number)
 		return pull, "", err
 	}
 	if f.Kind == gitlab {

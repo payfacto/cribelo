@@ -59,4 +59,9 @@ func TestPullRequestAddress(t *testing.T) {
 	gitlab := env(map[string]string{"CI_MERGE_REQUEST_PROJECT_URL": "https://gitlab.com/g/p", "CI_MERGE_REQUEST_IID": "7"})
 	assert.Equal(t, "https://gitlab.com/g/p/-/merge_requests/7", pullRequestAddress("", gitlab))
 	assert.Equal(t, "", pullRequestAddress("", env(nil)))
+
+	bitbucket := env(map[string]string{"BITBUCKET_WORKSPACE": "payfactopay", "BITBUCKET_REPO_SLUG": "cribelo", "BITBUCKET_PR_ID": "9"})
+	assert.Equal(t, "https://bitbucket.org/payfactopay/cribelo/pull-requests/9", pullRequestAddress("", bitbucket))
+	branch := env(map[string]string{"BITBUCKET_WORKSPACE": "payfactopay", "BITBUCKET_REPO_SLUG": "cribelo"})
+	assert.Equal(t, "", pullRequestAddress("", branch), "a branch pipeline is not a pull request")
 }
