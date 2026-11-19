@@ -30,6 +30,7 @@ FAKE
 	cat >"$sandbox/bin/git" <<'FAKE'
 #!/usr/bin/env bash
 echo "git $*" >>"$CALLS"
+case "$*" in *"${FAKE_GIT_FAILS:-no such command}"*) exit 128 ;; esac
 FAKE
 	cat >"$sandbox/bin/curl" <<'FAKE'
 #!/usr/bin/env bash
@@ -45,7 +46,7 @@ FAKE
 	export PATH="$sandbox/bin:$PATH" CALLS="$calls" SANDBOX="$sandbox"
 	export BITBUCKET_WORKSPACE=payfactopay BITBUCKET_REPO_SLUG=demo BITBUCKET_PR_ID=9
 	export BITBUCKET_COMMIT=abc123 BITBUCKET_PR_DESTINATION_BRANCH=main
-	unset CRIBELO_TOKEN CRIBELO_BOT_ACCOUNT_ID CRIBELO_BUDGET CRIBELO_TOP CRIBELO_FAIL_ON CRIBELO_FAIL_OVER FAKE_USER_ID FAKE_CRIBELO_STATUS EXISTING_COMMENTS
+	unset FAKE_GIT_FAILS CRIBELO_TOKEN CRIBELO_BOT_ACCOUNT_ID CRIBELO_BUDGET CRIBELO_TOP CRIBELO_FAIL_ON CRIBELO_FAIL_OVER FAKE_USER_ID FAKE_CRIBELO_STATUS EXISTING_COMMENTS
 }
 
 run() { (cd "$sandbox/work" && bash "$script" >"$sandbox/out" 2>&1); echo $? >"$sandbox/status"; }
@@ -114,6 +115,16 @@ setup
 export FAKE_CRIBELO_STATUS=2
 run
 [ "$(status)" = 2 ] || fail "crash: exit $(status)"
+
+# git cannot check out or fetch: cribelo is skipped, the pull request is not failed.
+for step in checkout fetch; do
+	setup
+	export FAKE_GIT_FAILS=$step CRIBELO_FAIL_OVER=30m
+	run
+	[ "$(status)" = 0 ] || fail "git $step fails: exit $(status)"
+	expect_contains "$sandbox/out" "skipping" "git $step fails: says it skips"
+	expect_missing "$calls" "cribelo --base" "git $step fails: cribelo is not run"
+done
 
 if [ "$failures" -gt 0 ]; then
 	echo "$failures failure(s)"

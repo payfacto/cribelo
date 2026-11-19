@@ -14,7 +14,7 @@
 #
 # Exit status: 0, or 1 when the gate fails (only with CRIBELO_FAIL_ON or
 # CRIBELO_FAIL_OVER), or the status of cribelo when it crashes. A failure of
-# the Bitbucket API never fails the step.
+# git or of the Bitbucket API never fails the step.
 
 set +e -uo pipefail
 
@@ -24,9 +24,16 @@ readonly max_comment_bytes=30000
 # Bitbucket Pipelines runs a pull request on a merge of the destination into
 # the source, made in the runner and never pushed: its links would not open.
 # The pushed commit is the one planned.
-git checkout -q --detach "$BITBUCKET_COMMIT" || exit 1
+# A checkout that git refuses skips cribelo: it never fails the pull request.
 destination="$BITBUCKET_PR_DESTINATION_BRANCH"
-git fetch --no-tags origin "+refs/heads/$destination:refs/remotes/origin/$destination" || exit 1
+if ! git checkout -q --detach "$BITBUCKET_COMMIT"; then
+	echo "cribelo: could not check out $BITBUCKET_COMMIT, skipping"
+	exit 0
+fi
+if ! git fetch --no-tags origin "+refs/heads/$destination:refs/remotes/origin/$destination"; then
+	echo "cribelo: could not fetch $destination, skipping"
+	exit 0
+fi
 
 args=(--base "origin/$destination" --no-color)
 [ -n "${CRIBELO_FAIL_ON:-}" ] && args+=(--fail-on "$CRIBELO_FAIL_ON")

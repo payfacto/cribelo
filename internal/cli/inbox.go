@@ -132,7 +132,9 @@ func fetchPulls(root string, site forge, pulls []pullRequest) map[int]string {
 		if p.HeadRefOid == "" {
 			continue
 		}
-		if _, err := gitIn(root, "cat-file", "-e", p.HeadRefOid+"^{commit}"); err != nil {
+		// The tip of a Bitbucket branch is fetched every time: the commit
+		// the API named must still be on it.
+		if _, err := gitIn(root, "cat-file", "-e", p.HeadRefOid+"^{commit}"); err != nil || site.Kind == bitbucket {
 			wanted = append(wanted, p)
 			refspecs = append(refspecs, fmt.Sprintf("+%s:refs/cribelo/pull/%d", site.headRef(p), p.Number))
 		}
@@ -164,18 +166,25 @@ func (f forge) headGone() string {
 
 // resolveHeads reads the short hashes Bitbucket gives as full ones, in
 // place. The commit the API named is the one planned, even when its branch
-// has moved on since; one no longer on the branch (a force push) is told.
+// has moved on since; one no longer on the branch tip just fetched (a force
+// push) is told.
 func resolveHeads(root string, pulls []pullRequest, unfetched map[int]string) {
+	const notOnBranch = "its commit is no longer on its branch"
 	for i, p := range pulls {
 		if _, gone := unfetched[p.Number]; gone || p.HeadRefOid == "" {
 			continue
 		}
 		full, err := gitIn(root, "rev-parse", "--verify", "--quiet", p.HeadRefOid+"^{commit}")
 		if err != nil {
-			unfetched[p.Number] = "its commit is no longer on its branch"
+			unfetched[p.Number] = notOnBranch
 			continue
 		}
-		pulls[i].HeadRefOid = strings.TrimSpace(full)
+		full = strings.TrimSpace(full)
+		if _, err := gitIn(root, "merge-base", "--is-ancestor", full, fmt.Sprintf("refs/cribelo/pull/%d", p.Number)); err != nil {
+			unfetched[p.Number] = notOnBranch
+			continue
+		}
+		pulls[i].HeadRefOid = full
 	}
 }
 

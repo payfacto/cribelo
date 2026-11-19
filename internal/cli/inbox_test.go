@@ -22,9 +22,9 @@ func gitRun(t *testing.T, dir string, args ...string) string {
 // bitbucketRemote is a clone of a repository with a main branch and a
 // pull request branch feat/one two commits ahead, as on Bitbucket Cloud:
 // no ref per pull request.
-func bitbucketRemote(t *testing.T) (clone, first, tip string) {
+func bitbucketRemote(t *testing.T) (server, clone, first, tip string) {
 	t.Helper()
-	server := t.TempDir()
+	server = t.TempDir()
 	gitRun(t, server, "init", "-q", "-b", "main")
 	gitRun(t, server, "commit", "-q", "--allow-empty", "-m", "base")
 	gitRun(t, server, "checkout", "-q", "-b", "feat/one")
@@ -35,11 +35,11 @@ func bitbucketRemote(t *testing.T) (clone, first, tip string) {
 	gitRun(t, server, "checkout", "-q", "main")
 	clone = t.TempDir()
 	gitRun(t, clone, "clone", "-q", "--no-local", "--single-branch", "-b", "main", server, ".")
-	return clone, first, tip
+	return server, clone, first, tip
 }
 
 func TestFetchPullsReadsBitbucketHeadsFromTheirBranch(t *testing.T) {
-	clone, first, tip := bitbucketRemote(t)
+	_, clone, first, tip := bitbucketRemote(t)
 	site := forge{Kind: bitbucket, Remote: "origin"}
 	pulls := []pullRequest{
 		{Number: 1, HeadRefOid: tip[:12], HeadRefName: "feat/one", BaseRefName: "main"},
@@ -56,7 +56,7 @@ func TestFetchPullsReadsBitbucketHeadsFromTheirBranch(t *testing.T) {
 }
 
 func TestFetchPullsTellsABitbucketBranchThatIsGone(t *testing.T) {
-	clone, _, tip := bitbucketRemote(t)
+	_, clone, _, tip := bitbucketRemote(t)
 	site := forge{Kind: bitbucket, Remote: "origin"}
 	pulls := []pullRequest{
 		{Number: 1, HeadRefOid: tip[:12], HeadRefName: "feat/one", BaseRefName: "main"},
@@ -67,4 +67,21 @@ func TestFetchPullsTellsABitbucketBranchThatIsGone(t *testing.T) {
 
 	assert.Equal(t, map[int]string{4: "its branch is gone from origin"}, unfetched)
 	assert.Equal(t, tip, pulls[0].HeadRefOid)
+}
+
+func TestFetchPullsTellsABitbucketCommitForcePushedAway(t *testing.T) {
+	server, clone, _, tip := bitbucketRemote(t)
+	site := forge{Kind: bitbucket, Remote: "origin"}
+	seen := []pullRequest{{Number: 1, HeadRefOid: tip[:12], HeadRefName: "feat/one", BaseRefName: "main"}}
+	require.Empty(t, fetchPulls(clone, site, seen), "a first look fetches the head")
+
+	gitRun(t, server, "checkout", "-q", "-B", "feat/one", "main")
+	gitRun(t, server, "commit", "-q", "--allow-empty", "-m", "rewritten")
+	gitRun(t, server, "checkout", "-q", "main")
+
+	stale := []pullRequest{{Number: 1, HeadRefOid: tip[:12], HeadRefName: "feat/one", BaseRefName: "main"}}
+	unfetched := fetchPulls(clone, site, stale)
+
+	assert.Equal(t, map[int]string{1: "its commit is no longer on its branch"}, unfetched,
+		"the commit is still in the repository, but no longer on the branch")
 }
