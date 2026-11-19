@@ -58,5 +58,6 @@ pipelines:
       - step: *check
       - step: *mirror
   custom:
-    mirror-manual:
+    mirror-manual: # same gate as main: the checks pass before anything is published
+      - step: *check
       - step: *mirror
