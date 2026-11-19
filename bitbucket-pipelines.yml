@@ -1,0 +1,48 @@
+# The PayFacto fork of cribelo. Every push: format, vet, tests, build. A tag
+# v<upstream>-pf.<n> (v2.4.0-pf.1) also publishes the Linux binary to the
+# Downloads of this repository, under its version and as the latest, once
+# the tests pass. Needs the secured repository variable
+# CRIBELO_RELEASE_TOKEN: a repository access token of this repository with
+# the repository:write scope.
+
+image: golang:1.27-bookworm
+
+definitions:
+  steps:
+    - step: &check
+        name: format, vet, test, build
+        script:
+          - apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends jq >/dev/null
+          - test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+          - go vet ./...
+          - CGO_ENABLED=1 go test ./...
+          - bash scripts/test/bitbucket-pr-comment.sh
+          - CGO_ENABLED=1 go build -o cribelo . && ./cribelo --version
+        caches:
+          - gomodules
+
+  caches:
+    gomodules: /go/pkg/mod
+
+pipelines:
+  default:
+    - step: *check
+  tags:
+    'v*':
+      - step: *check
+      - step:
+          name: publish the Linux binary
+          caches:
+            - gomodules
+          script:
+            - set -euo pipefail
+            - version="${BITBUCKET_TAG#v}"
+            - mkdir -p out
+            - CGO_ENABLED=1 go build -trimpath -ldflags "-s -w -X main.version=${version}" -o "out/cribelo_${version}_Linux_x86_64" .
+            - '"./out/cribelo_${version}_Linux_x86_64" --version'
+            - cp "out/cribelo_${version}_Linux_x86_64" out/cribelo_Linux_x86_64
+            - |
+              for file in "out/cribelo_${version}_Linux_x86_64" out/cribelo_Linux_x86_64; do
+                curl -fsS -X POST -H "Authorization: Bearer $CRIBELO_RELEASE_TOKEN" -F "files=@$file" \
+                  "https://api.bitbucket.org/2.0/repositories/$BITBUCKET_REPO_FULL_NAME/downloads" >/dev/null || exit 1
+              done

@@ -13,14 +13,15 @@ import (
 type Links func(file string, start, end int) string
 
 var (
-	githubPull  = regexp.MustCompile(`^(https?://[^/]+/[^/]+/[^/]+)/pull/(\d+)`)
-	gitlabMerge = regexp.MustCompile(`^(https?://.+)/-/merge_requests/\d+`)
+	githubPull    = regexp.MustCompile(`^(https?://[^/]+/[^/]+/[^/]+)/pull/(\d+)`)
+	gitlabMerge   = regexp.MustCompile(`^(https?://.+)/-/merge_requests/\d+`)
+	bitbucketPull = regexp.MustCompile(`^(https?://bitbucket\.org/[^/]+/[^/]+)/pull-requests/\d+`)
 )
 
 // PullRequestLinks builds the links of a pull request from its address. On
 // GitHub they open the diff of the pull request on the lines. On GitLab,
-// whose diff anchors need the line numbers of both sides, they open the file
-// at the head commit.
+// whose diff anchors need the line numbers of both sides, and on Bitbucket
+// Cloud, they open the file at the head commit.
 func PullRequestLinks(address, headSha string) (Links, error) {
 	if m := githubPull.FindStringSubmatch(address); m != nil {
 		files := m[1] + "/pull/" + m[2] + "/files"
@@ -36,21 +37,29 @@ func PullRequestLinks(address, headSha string) (Links, error) {
 		}, nil
 	}
 	if m := gitlabMerge.FindStringSubmatch(address); m != nil {
-		blob := m[1] + "/-/blob/" + headSha + "/"
-		return func(file string, start, end int) string {
-			segments := strings.Split(file, "/")
-			for i, s := range segments {
-				segments[i] = url.PathEscape(s)
-			}
-			address := blob + strings.Join(segments, "/")
-			switch {
-			case start <= 0:
-				return address
-			case end <= start:
-				return fmt.Sprintf("%s#L%d", address, start)
-			}
-			return fmt.Sprintf("%s#L%d-%d", address, start, end)
-		}, nil
+		return fileLinks(m[1]+"/-/blob/"+headSha+"/", "#L%d", "#L%d-%d"), nil
 	}
-	return nil, fmt.Errorf("%s is not the address of a GitHub pull request or of a GitLab merge request", address)
+	if m := bitbucketPull.FindStringSubmatch(address); m != nil {
+		return fileLinks(m[1]+"/src/"+headSha+"/", "#lines-%d", "#lines-%d:%d"), nil
+	}
+	return nil, fmt.Errorf("%s is not the address of a GitHub pull request, a GitLab merge request or a Bitbucket pull request", address)
+}
+
+// fileLinks opens a file at the head commit, under the blob address, with
+// the anchor formats of the forge for one line and for a span.
+func fileLinks(blob, oneLine, span string) Links {
+	return func(file string, start, end int) string {
+		segments := strings.Split(file, "/")
+		for i, s := range segments {
+			segments[i] = url.PathEscape(s)
+		}
+		address := blob + strings.Join(segments, "/")
+		switch {
+		case start <= 0:
+			return address
+		case end <= start:
+			return address + fmt.Sprintf(oneLine, start)
+		}
+		return address + fmt.Sprintf(span, start, end)
+	}
 }
