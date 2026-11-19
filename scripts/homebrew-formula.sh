@@ -6,7 +6,7 @@ set -eu
 
 version="${1#v}"
 dir="$2"
-base="https://github.com/cribelo/cribelo/releases/download/v$version"
+base="https://github.com/payfacto/cribelo/releases/download/v$version"
 
 sum() {
   f="$dir/$1"
@@ -17,7 +17,8 @@ sum() {
 cat <<RUBY
 class Cribelo < Formula
   desc "Ranks the files of a pull request by how much they need a human reader"
-  homepage "https://github.com/cribelo/cribelo"
+  homepage "https://github.com/payfacto/cribelo"
+  version "$version"
   license "MIT"
 
   on_macos do
