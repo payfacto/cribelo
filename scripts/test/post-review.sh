@@ -23,7 +23,7 @@ done
 case "$*" in
   "api user"*) exit 1 ;;
   *"/comments --paginate"*) echo 11 ;;
-  *"/reviews --input"*) ;;
+  *"/reviews --input"*) [ -z "${FAKE_POST_FAILS:-}" ] || exit 1 ;;
   *"pulls/7 --jq .head.sha"*) echo headsha ;;
 esac
 FAKE
@@ -70,7 +70,20 @@ post '{"comments":[{"path":"a.go","line":"1; rm","body":"b"}]}' && fail "a line 
 [ -e "$sandbox/posted.json" ] && fail "malformed line: a body was posted"
 grep -q DELETE "$sandbox/calls" && fail "malformed line: the earlier comments were removed before the body was checked"
 
+post "{\"comments\":$many}" 0 || fail "max 0: exit $?"
+[ "$(posted '.comments | length')" = 10 ] || fail "max 0 is the default 10: got $(posted '.comments | length')"
+
+post '{"comments":[{"path":"a.go","line":1,"body":"no marker"}]}' || fail "short body: exit $?"
+[ "$(posted '.comments[0].body | endswith("<!-- cribelo-review -->")')" = true ] || fail "a comment without the marker is posted as is"
+
+post '{"comments":[{"path":"a.go","line":1,"body":"b"}]}' || fail "order: exit $?"
+[ "$(grep -n -m1 '/reviews --input' "$sandbox/calls" | cut -d: -f1)" -lt "$(grep -n -m1 DELETE "$sandbox/calls" | cut -d: -f1)" ] \
+	|| fail "the earlier comments are removed before the new review is posted: $(cat "$sandbox/calls")"
+FAKE_POST_FAILS=1 post '{"comments":[{"path":"a.go","line":99999,"body":"b"}]}' && fail "a refused review exits 0"
+grep -q DELETE "$sandbox/calls" && fail "a refused review removed the earlier comments"
+
 post '{"comments":[]}' || fail "no comments: exit $?"
+grep -q DELETE "$sandbox/calls" || fail "no comments: the earlier comments are kept"
 [ -e "$sandbox/posted.json" ] && fail "no comments: a review was posted"
 
 if [ "$failures" -gt 0 ]; then
