@@ -105,6 +105,12 @@ done
 grep -q "SHA256SUMS" "$root/ci/gitlab-ci.yml" || fail "gitlab-ci.yml does not check SHA256SUMS"
 grep -q "install.sh" "$root/action.yml" || fail "action.yml does not install with the checked install.sh"
 
+# The docs send users to this fork's action, tap and releases, not upstream's.
+for f in README.md docs/*.md action.yml comment/action.yml; do
+	grep -nE "uses: +cribelo/cribelo|cribelo/tap/|cribelo/cribelo/comment|github.com/cribelo/cribelo(#|/releases|@)" "$root/$f" \
+		| sed "s#^#$f:#" | while read -r hit; do echo "FAIL: upstream reference: $hit"; done | grep . && failures=$((failures + 1))
+done
+
 if [ "$failures" -gt 0 ]; then
 	echo "$failures failure(s)"
 	exit 1

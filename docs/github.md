@@ -14,13 +14,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - uses: cribelo/cribelo@v2
+      - uses: payfacto/cribelo@v2.4.0-pf.3
 ```
+
+`v2.4.0-pf.3` is a release of the PayFacto fork; pin the newest one from [its releases](https://github.com/payfacto/cribelo/releases). The action installs that release's binary and checks it against its `SHA256SUMS`.
 
 The plan is posted as a single comment and updated on each push. Each line range in it links to the diff of the pull request. The job never fails on the content of the change unless you ask for a gate:
 
 ```yaml
-      - uses: cribelo/cribelo@v2
+      - uses: payfacto/cribelo@v2.4.0-pf.3
         with:
           fail-over: 1h
           fail-on: cycle, signature
@@ -39,7 +41,7 @@ The places to read closely are also marked on the diff, in the Files tab. Each o
 A function is told once, on the first lines the change touches in it, and what the diff does not show about a file goes with its first comment. Ten places are marked at most, the first ones in reading order, and the comments of the previous run are removed when a new push is reviewed. Both can be changed:
 
 ```yaml
-      - uses: cribelo/cribelo@v2
+      - uses: payfacto/cribelo@v2.4.0-pf.3
         with:
           inline-max: 20   # or inline: false, for the plan alone
 ```
@@ -64,7 +66,7 @@ jobs:
   comment:
     runs-on: ubuntu-latest
     steps:
-      - uses: cribelo/cribelo/comment@v2
+      - uses: payfacto/cribelo/comment@v2.4.0-pf.3
 ```
 
 This workflow checks out nothing and runs no code from the fork. It reads the plan as text, and posts it only if the pull request still points at the commit the plan was built from.
