@@ -1,7 +1,7 @@
 # Cribelo on GitLab merge requests. Include it from .gitlab-ci.yml:
 #
 #   include:
-#     - remote: https://raw.githubusercontent.com/payfacto/cribelo/v2.4.0-pf.3/ci/gitlab-ci.yml
+#     - remote: https://raw.githubusercontent.com/payfacto/cribelo/v2.4.0-pf.4/ci/gitlab-ci.yml
 #
 # The plan lands in the job log and in the "cribelo plan" artifact linked from
 # the merge request. With a CRIBELO_TOKEN variable (a project access token,

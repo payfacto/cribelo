@@ -38,7 +38,7 @@ One-time setup:
 3. Add the secret `HOMEBREW_TAP_TOKEN` (contents: write on `payfacto/homebrew-tap`) to `payfacto/cribelo`.
 4. Set the repository variable `GITHUB_MIRROR_ENABLED` to `true` on `payfactopay/cribelo`. Until then the mirror step pushes nothing and passes.
 5. After the first mirror push, disable upstream's review workflows there: `gh workflow disable cribelo.yml -R payfacto/cribelo` and `gh workflow disable cribelo-comment.yml -R payfacto/cribelo`.
-6. Once a release was built by the draft-then-publish `release.yml`, turn on release immutability in the settings of `payfacto/cribelo` (Settings -> General -> Releases). Published assets and their tag can then no longer be changed.
+6. Turn on release immutability in the settings of `payfacto/cribelo` (Settings -> General -> Releases). Published assets and their tag can then no longer be changed. It is on since 2026-11-20: `v2.4.0-pf.4` is the first locked release; earlier releases stay changeable, so their `SHA256SUMS` only catch corrupted downloads.
 
 ## Upstream
 

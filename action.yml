@@ -7,7 +7,7 @@ branding:
 
 inputs:
   version:
-    description: Cribelo version to run, a release of payfacto/cribelo such as 2.4.0-pf.3, checked against its SHA256SUMS. Default is the latest release. source builds the checkout of the action itself, for its own development.
+    description: Cribelo version to run, a release of payfacto/cribelo such as 2.4.0-pf.4, checked against its SHA256SUMS. Default is the latest release. source builds the checkout of the action itself, for its own development.
     default: latest
   base:
     description: Reference to compare against. Default is the base branch of the pull request.

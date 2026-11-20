@@ -1,6 +1,6 @@
 #!/bin/sh
 # Installs the latest cribelo release of the PayFacto fork into /usr/local/bin,
-# or ~/.local/bin when /usr/local/bin is not writable. CRIBELO_VERSION=2.4.0-pf.3
+# or ~/.local/bin when /usr/local/bin is not writable. CRIBELO_VERSION=2.4.0-pf.4
 # pins a version, CRIBELO_INSTALL_DIR=/some/dir chooses the destination. The
 # binary is installed only when it matches the SHA256SUMS of its release.
 set -eu
