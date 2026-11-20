@@ -10,7 +10,7 @@
 #                           plan is posted as one comment, edited on each push.
 #   CRIBELO_BOT_ACCOUNT_ID  the account id of that token, so only its own
 #                           comment is edited.
-#   CRIBELO_VERSION         a release such as 2.4.0-pf.3; latest by default.
+#   CRIBELO_VERSION         a release such as 2.4.0-pf.4; latest by default.
 #                           Pin it to choose when a new release runs with
 #                           your secrets.
 #   CRIBELO_DOWNLOAD_URL    a binary of your own, not checked: you host it.

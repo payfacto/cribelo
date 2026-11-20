@@ -4,7 +4,7 @@ GitLab keeps every job in a single `.gitlab-ci.yml`, so there is nothing to inst
 
 ```yaml
 include:
-  - remote: https://raw.githubusercontent.com/payfacto/cribelo/v2.4.0-pf.3/ci/gitlab-ci.yml
+  - remote: https://raw.githubusercontent.com/payfacto/cribelo/v2.4.0-pf.4/ci/gitlab-ci.yml
 ```
 
 It runs on merge request pipelines, in the `test` stage. The plan goes to the job log and to an artifact linked from the merge request as "cribelo plan". To get it as a note, updated on each push, store a token with the `api` scope as a masked `CRIBELO_TOKEN` variable; the job token of GitLab can read notes but not write them. A project access token with the Reporter role is the cleanest choice, but on GitLab.com it needs a Premium or Ultimate plan: on the Free plan, use a personal access token of an account that is a member of the project. Options are variables, named after the inputs of the Action:

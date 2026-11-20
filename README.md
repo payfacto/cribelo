@@ -95,7 +95,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - uses: payfacto/cribelo@v2.4.0-pf.3
+      - uses: payfacto/cribelo@v2.4.0-pf.4
 ```
 
 The plan is posted as one comment, updated on each push, and the places to read closely are marked on the diff. The job never fails unless you ask: [a time limit, facts that fail the job, pull requests from forks](docs/github.md).
@@ -104,7 +104,7 @@ The plan is posted as one comment, updated on each push, and the places to read 
 
 ```yaml
 include:
-  - remote: https://raw.githubusercontent.com/payfacto/cribelo/v2.4.0-pf.3/ci/gitlab-ci.yml
+  - remote: https://raw.githubusercontent.com/payfacto/cribelo/v2.4.0-pf.4/ci/gitlab-ci.yml
 ```
 
 One line in `.gitlab-ci.yml`, on gitlab.com or on your own instance. [The note on the merge request, the options, runners without access to github.com](docs/gitlab.md).
