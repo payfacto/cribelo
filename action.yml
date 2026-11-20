@@ -157,6 +157,7 @@ runs:
         ACTOR: ${{ github.actor }}
         PLAN: ${{ steps.plan.outputs.path }}
         REVIEW: ${{ steps.plan.outputs.review }}
+        INLINE_MAX: ${{ inputs.inline-max }}
       run: |
         set -uo pipefail
         handoff="the plan is in the job summary and in the cribelo-plan artifact; the cribelo/cribelo/comment action posts it, see https://github.com/cribelo/cribelo#pull-requests-from-forks"
@@ -165,7 +166,7 @@ runs:
           echo "posted=false" >> "$GITHUB_OUTPUT"
         elif "$GITHUB_ACTION_PATH/scripts/post-comment.sh" "$REPO" "$PR" "$PLAN"; then
           echo "posted=true" >> "$GITHUB_OUTPUT"
-          if [ -n "$REVIEW" ] && ! "$GITHUB_ACTION_PATH/scripts/post-review.sh" "$REPO" "$PR" "$REVIEW"; then
+          if [ -n "$REVIEW" ] && ! "$GITHUB_ACTION_PATH/scripts/post-review.sh" "$REPO" "$PR" "$REVIEW" "$INLINE_MAX"; then
             echo "::warning::cribelo: the plan is posted, the review comments on the lines are not"
           fi
         else
