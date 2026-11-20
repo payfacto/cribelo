@@ -1,6 +1,8 @@
 # Cribelo on Bitbucket Cloud pull requests (PayFacto fork). Copy the step
 # below into your bitbucket-pipelines.yml. The binary and the script come
-# from the public GitHub mirror payfacto/cribelo: no token to download.
+# from a release of the public GitHub mirror payfacto/cribelo (no token to
+# download) and run only when they match its SHA256SUMS. Releases before
+# 2.4.0-pf.3 have none: the step skips with them.
 #
 # Optional, per repository:
 #   CRIBELO_TOKEN           secured, a repository access token of your
@@ -8,9 +10,10 @@
 #                           plan is posted as one comment, edited on each push.
 #   CRIBELO_BOT_ACCOUNT_ID  the account id of that token, so only its own
 #                           comment is edited.
-#   CRIBELO_VERSION         a release such as 2.4.0-pf.1; latest by default.
-#                           Pin it: with latest, the script runs from the main
-#                           branch of payfacto/cribelo with your secrets.
+#   CRIBELO_VERSION         a release such as 2.4.0-pf.3; latest by default.
+#                           Pin it to choose when a new release runs with
+#                           your secrets.
+#   CRIBELO_DOWNLOAD_URL    a binary of your own, not checked: you host it.
 #   CRIBELO_BUDGET, CRIBELO_TOP, CRIBELO_FAIL_ON, CRIBELO_FAIL_OVER: as for
 #                           the GitHub Action. The step fails only with these.
 
@@ -23,25 +26,34 @@ definitions:
         clone:
           depth: full
         script:
-          # A failed package install or download skips cribelo: it never fails
-          # the pull request.
+          # A failed package install or download skips cribelo. Only a download
+          # that does not match SHA256SUMS fails the step: it may be tampered.
           - |
             version="${CRIBELO_VERSION:-latest}"
-            github="https://github.com/payfacto/cribelo"
             if [ "$version" = latest ]; then
-              binary_url="$github/releases/latest/download/cribelo_Linux_x86_64"; ref="main"
+              base="https://github.com/payfacto/cribelo/releases/latest/download"
             else
-              binary_url="$github/releases/download/v${version#v}/cribelo_Linux_x86_64"; ref="v${version#v}"
+              base="https://github.com/payfacto/cribelo/releases/download/v${version#v}"
             fi
+            dir=$(mktemp -d)
+            # matches NAME: the file NAME of $dir has the SHA-256 SHA256SUMS lists for it.
+            matches() {
+              want=$(awk -v n="$1" '$2 == n { print $1; exit }' "$dir/SHA256SUMS")
+              [ -n "$want" ] && [ "$(sha256sum "$dir/$1" | cut -d' ' -f1)" = "$want" ]
+            }
             if ! { apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends ca-certificates curl git jq >/dev/null; }; then
               echo "cribelo: could not install curl, git and jq, skipping"
-            elif ! curl -fsSL "${CRIBELO_DOWNLOAD_URL:-$binary_url}" -o /usr/local/bin/cribelo \
-              || ! curl -fsSL "https://raw.githubusercontent.com/payfacto/cribelo/$ref/scripts/bitbucket-pr-comment.sh" -o /tmp/cribelo-pr-comment.sh; then
-              echo "cribelo: could not download cribelo $version, skipping"
+            elif ! curl -fsSL "$base/SHA256SUMS" -o "$dir/SHA256SUMS" \
+              || ! curl -fsSL "$base/bitbucket-pr-comment.sh" -o "$dir/bitbucket-pr-comment.sh" \
+              || ! curl -fsSL "${CRIBELO_DOWNLOAD_URL:-$base/cribelo_Linux_x86_64}" -o "$dir/cribelo_Linux_x86_64"; then
+              echo "cribelo: could not download cribelo $version and its SHA256SUMS, skipping"
+            elif ! matches bitbucket-pr-comment.sh || { [ -z "${CRIBELO_DOWNLOAD_URL:-}" ] && ! matches cribelo_Linux_x86_64; }; then
+              echo "cribelo: the download does not match the SHA256SUMS of cribelo $version, not run"
+              exit 1
             else
               git config --global --add safe.directory "$BITBUCKET_CLONE_DIR"
-              chmod +x /usr/local/bin/cribelo
-              bash /tmp/cribelo-pr-comment.sh
+              install -m 755 "$dir/cribelo_Linux_x86_64" /usr/local/bin/cribelo
+              bash "$dir/bitbucket-pr-comment.sh"
             fi
         artifacts:
           - cribelo-plan.md

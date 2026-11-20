@@ -33,6 +33,7 @@ definitions:
           - bash scripts/test/bitbucket-pr-comment.sh
           - bash scripts/test/release-scripts.sh
           - bash scripts/test/post-review.sh
+          - bash scripts/test/downloads.sh
           - CGO_ENABLED=1 go build -o cribelo . && ./cribelo --version
     - step: &mirror
         name: strip .context and mirror to GitHub
