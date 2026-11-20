@@ -23,8 +23,8 @@ definitions:
         clone:
           depth: full
         script:
-          # A failed download skips cribelo, it never fails the pull request.
-          - apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends ca-certificates curl git jq >/dev/null
+          # A failed package install or download skips cribelo: it never fails
+          # the pull request.
           - |
             version="${CRIBELO_VERSION:-latest}"
             github="https://github.com/payfacto/cribelo"
@@ -33,11 +33,13 @@ definitions:
             else
               binary_url="$github/releases/download/v${version#v}/cribelo_Linux_x86_64"; ref="v${version#v}"
             fi
-            git config --global --add safe.directory "$BITBUCKET_CLONE_DIR"
-            if ! curl -fsSL "${CRIBELO_DOWNLOAD_URL:-$binary_url}" -o /usr/local/bin/cribelo \
+            if ! { apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends ca-certificates curl git jq >/dev/null; }; then
+              echo "cribelo: could not install curl, git and jq, skipping"
+            elif ! curl -fsSL "${CRIBELO_DOWNLOAD_URL:-$binary_url}" -o /usr/local/bin/cribelo \
               || ! curl -fsSL "https://raw.githubusercontent.com/payfacto/cribelo/$ref/scripts/bitbucket-pr-comment.sh" -o /tmp/cribelo-pr-comment.sh; then
               echo "cribelo: could not download cribelo $version, skipping"
             else
+              git config --global --add safe.directory "$BITBUCKET_CLONE_DIR"
               chmod +x /usr/local/bin/cribelo
               bash /tmp/cribelo-pr-comment.sh
             fi
