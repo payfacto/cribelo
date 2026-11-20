@@ -1,10 +1,11 @@
 #!/bin/sh
-# Installs the latest cribelo release into /usr/local/bin, or ~/.local/bin when
-# /usr/local/bin is not writable. CRIBELO_VERSION=1.2.0 pins a version,
-# CRIBELO_INSTALL_DIR=/some/dir chooses the destination.
+# Installs the latest cribelo release of the PayFacto fork into /usr/local/bin,
+# or ~/.local/bin when /usr/local/bin is not writable. CRIBELO_VERSION=2.4.0-pf.3
+# pins a version, CRIBELO_INSTALL_DIR=/some/dir chooses the destination. The
+# binary is installed only when it matches the SHA256SUMS of its release.
 set -eu
 
-repo="cribelo/cribelo"
+repo="payfacto/cribelo"
 os=$(uname -s)
 case "$os" in
   Linux) os=Linux ;;
@@ -22,9 +23,9 @@ esac
 name="cribelo_${os}_${arch}"
 [ "$os" = Windows ] && name="$name.exe"
 if [ -n "${CRIBELO_VERSION:-}" ]; then
-  url="https://github.com/$repo/releases/download/v${CRIBELO_VERSION#v}/$name"
+  base="https://github.com/$repo/releases/download/v${CRIBELO_VERSION#v}"
 else
-  url="https://github.com/$repo/releases/latest/download/$name"
+  base="https://github.com/$repo/releases/latest/download"
 fi
 
 dir="${CRIBELO_INSTALL_DIR:-}"
@@ -33,13 +34,26 @@ if [ -z "$dir" ]; then
 fi
 mkdir -p "$dir"
 
-tmp=$(mktemp)
-trap 'rm -f "$tmp"' EXIT
-echo "Downloading $url"
-curl -fsSL "$url" -o "$tmp"
-chmod +x "$tmp"
-mv "$tmp" "$dir/cribelo"
-trap - EXIT
+sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d' ' -f1
+}
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+echo "Downloading $base/$name"
+curl -fsSL "$base/$name" -o "$tmp/$name"
+if ! curl -fsSL "$base/SHA256SUMS" -o "$tmp/SHA256SUMS"; then
+  echo "cribelo: this release has no SHA256SUMS (releases before 2.4.0-pf.3 have none): set CRIBELO_VERSION to a newer one" >&2
+  exit 1
+fi
+want=$(awk -v n="$name" '$2 == n || $2 == "*" n { print $1; exit }' "$tmp/SHA256SUMS")
+got=$(sha256 "$tmp/$name")
+if [ -z "$want" ] || [ "$got" != "$want" ]; then
+  echo "cribelo: $name does not match the SHA256SUMS of its release, not installed" >&2
+  exit 1
+fi
+chmod +x "$tmp/$name"
+mv "$tmp/$name" "$dir/cribelo"
 
 echo "Installed $("$dir/cribelo" --version) in $dir"
 cmd=cribelo

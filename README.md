@@ -33,7 +33,7 @@ cribelo
 
 It runs on your machine, from the git checkout. There is no service, no account and no language model, and the same change gives the same plan everywhere. It reads Go, PHP, Python, Rust, TypeScript, Java and C#.
 
-Without Homebrew: `curl -fsSL https://raw.githubusercontent.com/cribelo/cribelo/main/install.sh | sh`, or a binary for Linux, macOS and Windows from the [releases page](https://github.com/cribelo/cribelo/releases).
+Without Homebrew: `curl -fsSL https://raw.githubusercontent.com/payfacto/cribelo/main/install.sh | sh` (it checks the binary against the `SHA256SUMS` of the release), or a binary for Linux, macOS and Windows from the [releases page](https://github.com/payfacto/cribelo/releases).
 
 ## Check it on your own history
 
@@ -104,7 +104,7 @@ The plan is posted as one comment, updated on each push, and the places to read 
 
 ```yaml
 include:
-  - remote: https://raw.githubusercontent.com/cribelo/cribelo/v2/ci/gitlab-ci.yml
+  - remote: https://raw.githubusercontent.com/payfacto/cribelo/v2.4.0-pf.3/ci/gitlab-ci.yml
 ```
 
 One line in `.gitlab-ci.yml`, on gitlab.com or on your own instance. [The note on the merge request, the options, runners without access to github.com](docs/gitlab.md).
