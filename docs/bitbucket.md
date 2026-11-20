@@ -27,7 +27,7 @@ Install:
 
 ## Releases
 
-Bitbucket `payfactopay/cribelo` is the source of truth. After the tests, its pipeline strips `.context/` from the history and pushes `main` and each `v*` tag to the public mirror `github.com/payfacto/cribelo` (`scripts/mirror-to-github.sh`). On a tag, the mirror's `.github/workflows/release.yml` builds on native runners (cgo rules out cross-compiling): Linux x86_64 and arm64, macOS arm64 and x86_64, Windows x86_64. It attaches them to the GitHub release and updates `Formula/cribelo.rb` in `payfacto/homebrew-tap`.
+Bitbucket `payfactopay/cribelo` is the source of truth. After the tests, its pipeline strips `.context/` from the history and pushes `main` and each `v*` tag to the public mirror `github.com/payfacto/cribelo` (`scripts/mirror-to-github.sh`). On a tag, the mirror's `.github/workflows/release.yml` builds on native runners (cgo rules out cross-compiling): Linux x86_64 and arm64, macOS arm64 and x86_64, Windows x86_64. A last job (`scripts/publish-release.sh`) creates the GitHub release as a draft with every binary, `bitbucket-pr-comment.sh` and `SHA256SUMS` (`scripts/release-checksums.sh`), then publishes it; it never replaces the assets of a published release. Then it updates `Formula/cribelo.rb` in `payfacto/homebrew-tap`. A failed release is fixed by a new tag.
 
 Tags are `v<upstream version>-pf.<n>` (`v2.4.0-pf.1`): stable releases (`scripts/release-kind.sh`). A tag such as `v2.4.0-pf.1-rc.1` is a pre-release and skips Homebrew.
 
@@ -38,6 +38,7 @@ One-time setup:
 3. Add the secret `HOMEBREW_TAP_TOKEN` (contents: write on `payfacto/homebrew-tap`) to `payfacto/cribelo`.
 4. Set the repository variable `GITHUB_MIRROR_ENABLED` to `true` on `payfactopay/cribelo`. Until then the mirror step pushes nothing and passes.
 5. After the first mirror push, disable upstream's review workflows there: `gh workflow disable cribelo.yml -R payfacto/cribelo` and `gh workflow disable cribelo-comment.yml -R payfacto/cribelo`.
+6. Once a release was built by the draft-then-publish `release.yml`, turn on release immutability in the settings of `payfacto/cribelo` (Settings -> General -> Releases). Published assets and their tag can then no longer be changed.
 
 ## Upstream
 

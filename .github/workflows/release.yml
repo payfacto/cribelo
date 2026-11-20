@@ -1,5 +1,8 @@
-# A tag vX.Y.Z builds the cribelo binary for every platform and attaches it to
-# the release of the same name. install.sh and action.yml download from there.
+# A tag vX.Y.Z builds the cribelo binary for every platform; the publish job
+# then creates the release of the same name with every binary, the Bitbucket
+# CI script and SHA256SUMS, as a draft published in one step (release
+# immutability: nothing is added or replaced after). install.sh, action.yml
+# and the CI templates download from there and check SHA256SUMS.
 # A version with a dash (v1.0.0-rc.1) is published as a pre-release, which
 # releases/latest ignores; a release of the PayFacto fork (v2.4.0-pf.1) is
 # stable (scripts/release-kind.sh). This repository is the public mirror of
@@ -10,7 +13,7 @@ on:
     tags: ["v*.*.*"]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -56,21 +59,34 @@ jobs:
           go build -trimpath -ldflags "-s -w -X main.version=${version}" -o "out/$ASSET" .
           "./out/$ASSET" --version
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: out/${{ matrix.asset }}
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
       - name: Publish
-        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          ASSET: ${{ matrix.asset }}
         run: |
           set -euo pipefail
-          tag="$GITHUB_REF_NAME"
-          flags=()
-          if [ "$(sh scripts/release-kind.sh "$tag")" = prerelease ]; then flags+=(--prerelease); fi
-          # Five jobs race to create the release; the losers fall through to the upload.
-          gh release view "$tag" >/dev/null 2>&1 \
-            || gh release create "$tag" --title "$tag" --generate-notes ${flags[@]+"${flags[@]}"} \
-            || true
-          gh release upload "$tag" --clobber "out/$ASSET"
+          # The Bitbucket CI template runs this script: it ships with the
+          # release, under SHA256SUMS, instead of being read from a branch.
+          cp scripts/bitbucket-pr-comment.sh out/
+          sh scripts/publish-release.sh "$GITHUB_REF_NAME" out
 
   # Rewrites Formula/cribelo.rb in payfacto/homebrew-tap so that
   # `brew install payfacto/tap/cribelo` gets this version. Pre-releases are
@@ -78,7 +94,7 @@ jobs:
   # Needs the HOMEBREW_TAP_TOKEN secret: a token with contents: write on
   # payfacto/homebrew-tap.
   homebrew:
-    needs: build
+    needs: publish
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
