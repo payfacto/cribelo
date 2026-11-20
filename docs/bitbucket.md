@@ -9,7 +9,7 @@ This fork of [cribelo](https://github.com/cribelo/cribelo) adds Bitbucket Cloud:
 
 The step plans the commit you pushed, not the merge Bitbucket makes in the runner, so the links open. It posts one comment and edits it on each push. Set `CRIBELO_BOT_ACCOUNT_ID` to the account id of the token (shown as the author of the first comment) so that only that account's comment is edited: a repository access token cannot read its own account, and without the id the marker alone is trusted.
 
-Options are variables: `CRIBELO_BUDGET`, `CRIBELO_TOP`, `CRIBELO_FAIL_ON`, `CRIBELO_FAIL_OVER` (as for the GitHub Action), `CRIBELO_VERSION` (a release such as `2.4.0-pf.1`, `latest` by default). Pin it: with `latest`, the step runs the script of the `main` branch of `payfacto/cribelo` with the secrets of your pipeline. The step fails only when the gate fails, and the gate is off unless you set `CRIBELO_FAIL_ON` or `CRIBELO_FAIL_OVER`. A Bitbucket API error, a git checkout or fetch error or a failed download never fails it: cribelo is skipped with a line in the log.
+Options are variables: `CRIBELO_BUDGET`, `CRIBELO_TOP`, `CRIBELO_FAIL_ON`, `CRIBELO_FAIL_OVER` (as for the GitHub Action), `CRIBELO_VERSION` (a release such as `2.4.0-pf.1`, `latest` by default). Pin it: with `latest`, the step runs the script of the `main` branch of `payfacto/cribelo` with the secrets of your pipeline. The step fails only when the gate fails, and the gate is off unless you set `CRIBELO_FAIL_ON` or `CRIBELO_FAIL_OVER`. A Bitbucket API error, a git checkout or fetch error, a failed package install or a failed download never fails it: cribelo is skipped with a line in the log.
 
 Bitbucket does not render HTML, so the folded sections of the plan come as plain Markdown.
 
