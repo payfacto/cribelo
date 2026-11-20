@@ -27,7 +27,7 @@ The diff shows one copy. The other, which nobody opened, is the one that will mi
 Try it on the branch you want reviewed:
 
 ```sh
-brew install cribelo/tap/cribelo
+brew install payfacto/tap/cribelo
 cribelo
 ```
 
@@ -95,7 +95,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - uses: cribelo/cribelo@v2
+      - uses: payfacto/cribelo@v2.4.0-pf.3
 ```
 
 The plan is posted as one comment, updated on each push, and the places to read closely are marked on the diff. The job never fails unless you ask: [a time limit, facts that fail the job, pull requests from forks](docs/github.md).

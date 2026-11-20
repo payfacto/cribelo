@@ -139,7 +139,7 @@ runs:
 
     # On a pull request from a fork, or opened by Dependabot, GitHub gives the
     # job a read-only token whatever the workflow asks for. The comment is then
-    # left to the cribelo/cribelo/comment action, run by a workflow_run
+    # left to the payfacto/cribelo/comment action, run by a workflow_run
     # workflow, which reads the plan from the artifact uploaded below.
     - name: Comment
       id: comment
@@ -156,7 +156,7 @@ runs:
         INLINE_MAX: ${{ inputs.inline-max }}
       run: |
         set -uo pipefail
-        handoff="the plan is in the job summary and in the cribelo-plan artifact; the cribelo/cribelo/comment action posts it, see https://github.com/cribelo/cribelo#pull-requests-from-forks"
+        handoff="the plan is in the job summary and in the cribelo-plan artifact; the payfacto/cribelo/comment action posts it, see https://github.com/payfacto/cribelo/blob/main/docs/github.md#pull-requests-from-forks"
         if [ "$HEAD_REPO" != "$REPO" ] || [ "$ACTOR" = "dependabot[bot]" ]; then
           echo "::notice::cribelo: the token of a pull request from a fork or from Dependabot cannot comment; $handoff"
           echo "posted=false" >> "$GITHUB_OUTPUT"
@@ -180,7 +180,7 @@ runs:
         NOTICES: ${{ steps.plan.outputs.notices }}
       run: |
         set -euo pipefail
-        if grep -rqsE 'cribelo/cribelo/comment|uses: +\./comment' "$GITHUB_WORKSPACE/.github/workflows"; then
+        if grep -rqsE '(cribelo|payfacto)/cribelo/comment|uses: +\./comment' "$GITHUB_WORKSPACE/.github/workflows"; then
           echo "the comment workflow of this repository posts the review comments"
         else
           cat "$NOTICES"

@@ -9,4 +9,4 @@ go work init . ../ast-metrics
 go test ./... && go run . -C ../some-repository
 ```
 
-`go install github.com/cribelo/cribelo@latest` builds it from source; it needs a C compiler for the tree-sitter parsers.
+`git clone https://github.com/payfacto/cribelo && cd cribelo && CGO_ENABLED=1 go build -o cribelo .` builds it from source; it needs a C compiler for the tree-sitter parsers.

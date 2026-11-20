@@ -28,7 +28,7 @@ runs:
       run: |
         set -euo pipefail
         if [ "$EVENT" != workflow_run ]; then
-          echo "::error::cribelo/cribelo/comment runs from a workflow_run workflow"
+          echo "::error::payfacto/cribelo/comment runs from a workflow_run workflow"
           exit 1
         fi
         if [ "$RUN_EVENT" != pull_request ]; then
